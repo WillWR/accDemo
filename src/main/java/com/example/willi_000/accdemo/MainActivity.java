@@ -1,26 +1,44 @@
 package com.example.willi_000.accdemo;
 
+import android.content.Intent;
 import android.hardware.Sensor;
 import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
 import android.os.Bundle;
-import android.support.design.widget.FloatingActionButton;
-import android.support.design.widget.Snackbar;
 import android.support.v7.app.AppCompatActivity;
-import android.support.v7.widget.Toolbar;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.widget.Button;
 import android.widget.TextView;
+import android.bluetooth.*;
+
+import org.w3c.dom.Text;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.lang.reflect.Method;
+import java.util.Set;
+import java.util.UUID;
+
+
 
 public class MainActivity extends AppCompatActivity implements SensorEventListener {
+
 
     Sensor accelerometer;
     SensorManager sm;
     TextView acceleration;
+    TextView connected;
+    BluetoothDevice arduino;
+    BluetoothSocket socket;
+    OutputStream output;
+    InputStream input;
+    String add ="98:D3:35:00:C1:53";
+
 
     int m1state=0;
     int m2state=0;
@@ -39,6 +57,34 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+        BluetoothAdapter bt = BluetoothAdapter.getDefaultAdapter();
+
+        if(!bt.isEnabled()){
+            Intent turnBTon = new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE);
+            startActivityForResult(turnBTon,1);
+        }
+
+        Set<BluetoothDevice> paired = bt.getBondedDevices();
+        if(paired.size()>0){
+            for(BluetoothDevice device : paired){
+                if(device.getAddress().equals(add)){
+                    arduino = device;
+                    break;
+                }
+            }
+        }
+
+        try{
+            UUID uuid = UUID.fromString("00001101-0000-1000-8000-00805f9b34fb");
+            socket = arduino.createRfcommSocketToServiceRecord(uuid);
+            socket.connect();
+            output = socket.getOutputStream();
+            input=socket.getInputStream();
+
+
+        } catch(Exception e){}
+        connected = (TextView)findViewById(R.id.connectedLbl);
+
 
 
         sm=(SensorManager)getSystemService(SENSOR_SERVICE);
@@ -47,7 +93,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         acceleration=(TextView)findViewById(R.id.accelerometer);
         //BUTTONS
         //M1Open
-        m1Open = (Button)findViewById(R.id.m1Close);
+        m1Open = (Button)findViewById(R.id.m1Open);
         m1Open.setOnTouchListener(new View.OnTouchListener() {
             @Override
             public boolean onTouch(View v, MotionEvent event) {
@@ -62,7 +108,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
             }
         });
         //M1Close
-        m1Close = (Button)findViewById(R.id.m1Open);
+        m1Close = (Button)findViewById(R.id.m1Close);
         m1Close.setOnTouchListener(new View.OnTouchListener() {
             @Override
             public boolean onTouch(View v, MotionEvent event) {
@@ -139,6 +185,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
 
     }
 
+
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
         // Inflate the menu; this adds items to the action bar if it is present.
@@ -168,26 +215,33 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
             m3state=0;
         }
         else if(event.values[0]<-4){
-            m3state=1;
+            m3state=2;
         }
         else if(event.values[0]>4){
-            m3state=2;
+            m3state=1;
         }
 
         if((event.values[1]>=-4)&&(event.values[1]<=4)){
             m4state=0;
         }
         else if(event.values[1]<-4){
-            m4state=2;
+            m4state=1;
         }
         else if(event.values[1]>4){
-            m4state=1;
+            m4state=2;
         }
         acceleration.setText("X: " +m3state+
                             "\nY: "+m4state+
                             "\nClamp: "+m1state+
                             "\nWrist: "+m2state+
                             "\nBase: "+m5state);
+        String msg = "\n"+m1state+","+m2state+","+m3state+","+m4state+","+m5state;
+        connected.setText(msg);
+        try {
+            output.write(msg.getBytes());
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 
     @Override
@@ -195,3 +249,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
 
     }
 }
+
+
+
+
